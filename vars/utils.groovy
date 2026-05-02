@@ -3,23 +3,29 @@
 // description: short message shown in the GitHub UI (max 140 chars)
 // context: label for the check (e.g. 'Jenkins CI / Build', 'Jenkins CI / Trivy')
 def updateCommitStatus(String state, String description, String context = 'Jenkins CI') {
-    // githubNotify auto-inference requires the GitHub Branch Source plugin's SCM object.
-    // When that is absent (plain Git source, or plugin version mismatch), inference fails.
-    // Parsing GIT_URL + GIT_COMMIT is always reliable — Jenkins sets both during checkout.
+    // githubNotify plugin fails to resolve credentials when called from inside a shared
+    // library pipeline block (known plugin bug with CredentialsProvider scoping).
+    // Using the GitHub Statuses REST API directly via curl — same pattern as Dependabot stage.
     def repoUrl = env.GIT_URL ?: env.GIT_URL_1 ?: ''
     def matcher = repoUrl =~ /github\.com[\/:]([^\/]+)\/([^\/]+?)(?:\.git)?$/
     if (!matcher) {
         error("updateCommitStatus: cannot parse GitHub account/repo from GIT_URL '${repoUrl}'")
     }
-    githubNotify(
-        credentialsId: 'github-token',
-        status:        state.toUpperCase(),
-        description:   description,
-        context:       context,
-        account:       matcher[0][1],
-        repo:          matcher[0][2],
-        sha:           env.GIT_COMMIT
-    )
+    def account = matcher[0][1]
+    def repo    = matcher[0][2]
+    def sha     = env.GIT_COMMIT
+
+    withCredentials([string(credentialsId: 'github-token', variable: 'GH_TOKEN')]) {
+        sh """
+            curl -sf -X POST \
+                -H "Authorization: Bearer \$GH_TOKEN" \
+                -H "Accept: application/vnd.github+json" \
+                -H "X-GitHub-Api-Version: 2022-11-28" \
+                -H "Content-Type: application/json" \
+                "https://api.github.com/repos/${account}/${repo}/statuses/${sha}" \
+                -d '{"state":"${state.toLowerCase()}","description":"${description}","context":"${context}"}'
+        """
+    }
 }
 
 // Creates a Jira Cloud issue via the JIRA Pipeline Steps plugin (site: 'jira').
