@@ -23,7 +23,7 @@ def call(Map configMap){
                 steps {
                     script {
                         appVersion = sh(
-                            script: "mvn help:evaluate -Dexpression=project.version -q -DforceStdout",
+                            script: "readMavenPom(file: 'pom.xml').version",
                             returnStdout: true
                         ).trim()
                         echo "Building version ${appVersion}"
