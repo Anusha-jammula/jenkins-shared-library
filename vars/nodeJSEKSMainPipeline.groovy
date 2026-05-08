@@ -156,7 +156,7 @@ def call(Map configMap) {
                                 helm upgrade --install ${component} -f values-prod.yaml -n ${project}-prod --atomic --wait --timeout=5m .
                             """
                         }
-                        echo "PROD deploy succeeded — Jira transition handled by Jira Automation"
+                        utils.transitionJiraTicket(env.JIRA_ISSUE, 'Done')
                         withCredentials([string(credentialsId: 'github-token', variable: 'GITHUB_TOKEN')]) {
                             sh '''
                                 APP_VERSION=$(jq -r .version package.json)
