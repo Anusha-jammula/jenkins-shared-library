@@ -32,6 +32,22 @@ def call(Map configMap){
                     }
                 }
             }
+            stage('Check Version Tag in Git') {
+                steps {
+                    script {
+                        def tagExists = sh(
+                            script: "git ls-remote --tags origin refs/tags/${appVersion}",
+                            returnStdout: true
+                        ).trim()
+            
+                        if (tagExists) {
+                            error("❌ Version ${appVersion} already exists as a Git tag! Update the version in package.json before building.")
+                        } else {
+                            echo "✅ Version ${appVersion} is new. Proceeding with the build."
+                        }
+                    }
+                }
+            }
             stage('Install Dependencies') {
                 steps {
                     script{
